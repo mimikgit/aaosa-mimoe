@@ -1,0 +1,74 @@
+{
+    # ==========================================================================
+    # neuro-san agent network: "lab_ops_mcp"
+    #
+    # Consumes the mimOE FRONT-MAN as an MCP TOOL — no adapter, no external-agent
+    # shim. neuro-san treats any tools-list entry whose URL ends in `/mcp` (or
+    # starts with `https://mcp`) as an MCP server: it connects over streamable-HTTP,
+    # lists the server's tools, and lets the agent call them. The front-man serves
+    # exactly that surface (built with @mimik/mcp-kit) at
+    #     http://<front-man-node>:8083/mimik-aaosa/agent/v1/mcp
+    # exposing one tool: `front_man` (arg: inquiry -> runs the whole AAOSA mesh).
+    #
+    # This network is SELF-CONTAINED: it has no `include` directives, so it can be
+    # served directly from this repo's registries/ directory. See pov/RUNBOOK.md
+    # section E.
+    # ==========================================================================
+
+    # The LLM the coordinator reasons with. This uses Anthropic Claude — set
+    # ANTHROPIC_API_KEY in the environment (a .env file in the neuro-san project
+    # root, or `export` it before `ns run`). The name must be one your neuro-san
+    # install actually knows: run `ns check-config` to list them, and `ns
+    # check-llm-keys` to confirm the key is picked up. For OpenAI use "gpt-4o" +
+    # OPENAI_API_KEY; to reason on a local milm instead, register a custom llm in
+    # neuro-san's llm_info config and reference it here by name.
+    "llm_config": { "model_name": "claude-sonnet-5" },
+
+    # OPTIONAL — only if you put auth on the mim's /mcp endpoint (it is open by
+    # default). Keyed by the exact server URL. You can also set these globally via
+    # the MCP_SERVERS_INFO_FILE env var instead of inline here.
+    # "http_headers": {
+    #     "http://192.168.1.101:8083/mimik-aaosa/agent/v1/mcp": { "Authorization": "Bearer <edge-jwt>" }
+    # },
+
+    "metadata": {
+        "description": "Hardware-lab assistant: a single neuro-san agent that delegates to the mimOE AAOSA mesh through one MCP tool (front_man).",
+        "tags": ["example", "mcp", "aaosa", "mimoe", "edge"],
+        "sample_queries": [
+            "How hot is the raspberry pi right now, and is it under load?",
+            "What network setup do we need to add a second raspberry pi to this lab?",
+            "Given the pi's temperature and load, is it safe to add more agent workloads, and what network prep would a second pi need?"
+        ]
+    },
+
+    "tools": [
+        {
+            # Front-man of THIS neuro-san network (its top agent).
+            "name": "lab_assistant",
+            "function": {
+                "description": "Answers hardware-lab questions by delegating to the mimOE AAOSA mesh."
+            },
+            "instructions": """
+You assist with a hardware lab. You have one tool, `front_man` — the mesh
+coordinator running on mimOE. Calling it runs the whole AAOSA mesh (network and
+device specialists) and returns one synthesized answer. For any lab question, call
+`front_man` with the user's question verbatim as the `inquiry` argument, then relay
+its answer to the user.
+""",
+            "command": "Call the front_man tool with the user's inquiry and return its answer.",
+
+            # MCP server by URL. The inner list whitelists just front_man; remove
+            # it to expose every tool the server advertises.
+            #
+            # REPLACE 192.168.1.101 with your front-man node's LAN address, the
+            # same value as MBP1_IP in pov/env.sh. It must be reachable from the
+            # machine running neuro-san.
+            "tools": [
+                {
+                    "url": "http://192.168.1.101:8083/mimik-aaosa/agent/v1/mcp",
+                    "tools": ["front_man"]
+                }
+            ]
+        }
+    ]
+}

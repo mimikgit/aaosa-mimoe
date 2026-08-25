@@ -1,0 +1,64 @@
+{
+    # ============================================================================
+    # neuro-san agent network: "lab_ops"
+    #
+    # A neuro-san coordinator that fronts the mimOE AAOSA mesh. It exposes ALL
+    # THREE mimOE agents as EXTERNAL agents (referenced by URL in its tools list)
+    # so it can either hand a whole inquiry to the mesh (front_man) or reach a
+    # single specialist directly (network_agent / pi_device_agent).
+    #
+    # The URLs point at neuro-san/adapter.js, which serves the neuro-san external
+    # surface (/api/v1/<name>/function + /streaming_chat) and translates each call
+    # into the mesh's /chat or /aaosa. Change 127.0.0.1:4747 to wherever you run
+    # the adapter.
+    # ============================================================================
+
+    # Default LLM for the coordinator's OWN routing + synthesis reasoning. Point
+    # this at whatever your neuro-san install is configured to use. To run the
+    # coordinator on your local milm instead, register a custom llm in neuro-san's
+    # llm_info config and reference it here by name.
+    "llm_config": {
+        "model_name": "gpt-4o"
+    },
+
+    "tools": [
+
+        # ---- Front-man of THIS neuro-san network (the top-level agent) ---------
+        {
+            "name": "lab_coordinator",
+            "function": {
+                "description": "Coordinates hardware-lab inquiries by delegating to the mimOE AAOSA mesh and its specialists."
+            },
+            "instructions": """
+You are the coordinator for a hardware lab. You have three downstream agents,
+all running as EXTERNAL mimOE AAOSA agents:
+
+- front_man: the lab MESH coordinator. Delegating to it runs the whole mesh
+  (network + device specialists) and returns one synthesized answer. Prefer it
+  for compound or ambiguous questions, or anything that may span specialties.
+- network_agent: NETWORK specialist (topology, LAN/WiFi, firewalls, adding
+  devices to the mesh, connectivity troubleshooting). Call it directly for a
+  pure network question.
+- pi_device_agent: Raspberry Pi HEALTH specialist (CPU temperature, load,
+  memory, uptime). Call it directly for a question about the device's current
+  state or capacity.
+
+Decide which downstream agent(s) can address the user's inquiry and delegate.
+For a single-domain question, call the matching specialist directly. For a
+multi-part or unclear question, delegate to front_man and let the mesh route it.
+Pass the user's inquiry verbatim as the `inquiry` argument, then synthesize the
+returned answer(s) into one reply for the user.
+""",
+            "command": "Determine which downstream agent(s) can address the inquiry, delegate to them, and return a synthesized answer.",
+
+            # External agents, referenced by URL. neuro-san reads each one's
+            # /api/v1/<name>/function to learn its signature, then calls
+            # /api/v1/<name>/streaming_chat to run it.
+            "tools": [
+                "http://127.0.0.1:4747/front_man",
+                "http://127.0.0.1:4747/network_agent",
+                "http://127.0.0.1:4747/pi_device_agent"
+            ]
+        }
+    ]
+}

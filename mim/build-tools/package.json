@@ -1,0 +1,13 @@
+{
+  "name": "aaosa-build-tools",
+  "private": true,
+  "description": "Toolchain for producing the ES5 mim bundle (mimOE serverless engine is ES5; mimik's own mims ship Babel+core-js output).",
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/cli": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "core-js": "^3.36.0",
+    "regenerator-runtime": "^0.14.1",
+    "acorn": "^8.11.0"
+  }
+}

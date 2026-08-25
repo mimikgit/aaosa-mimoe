@@ -1,0 +1,17 @@
+{
+    # neuro-san server manifest. Point AGENT_MANIFEST_FILE at this file; each key
+    # is a .hocon agent-network in this directory, `true` serves it. The network
+    # name the client connects to is the file stem, e.g. "lab_ops".
+    #
+    # lab_ops      : the three mimOE agents as neuro-san EXTERNAL agents, reached
+    #                through neuro-san/adapter.js. See neuro-san/README.md.
+    # lab_ops_mcp  : the front-man as a single MCP TOOL, no adapter. Preferred.
+    #                See neuro-san/MCP.md and pov/RUNBOOK.md section E.
+    #
+    # Both are self-contained (no `include` directives), so they can be served
+    # straight out of this repo. The file under examples/ is NOT listed here: it
+    # depends on neuro-san-studio's own include files and belongs in that project's
+    # registries directory instead.
+    "lab_ops.hocon": true,
+    "lab_ops_mcp.hocon": true
+}

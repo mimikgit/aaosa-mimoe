@@ -1,0 +1,52 @@
+aaosa-mimoe
+Copyright 2026 mimik Technology, Inc.
+
+This product includes software developed at mimik Technology, Inc.
+(https://mimik.com/).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+--------------------------------------------------------------------------------
+THIRD-PARTY MATERIAL
+--------------------------------------------------------------------------------
+
+1. neuro-san and neuro-san-studio
+   Copyright (c) 2025-2026 Cognizant Technology Solutions Corp.
+   Licensed under the Apache License, Version 2.0.
+   https://github.com/cognizant-ai-lab/neuro-san
+   https://github.com/cognizant-ai-lab/neuro-san-studio
+
+   The file
+
+       neuro-san/registries/examples/telco_network_orchestration.hocon
+
+   is redistributed from neuro-san-studio with its original copyright header
+   intact. It has been modified to reference this project's "lab_ops_mcp" agent
+   network from one node agent, and to add one sample query. Both modifications
+   are documented in a provenance block at the top of that file.
+
+2. AAOSA (Adaptive Agent Oriented Software Architecture)
+   The architecture originates in the published work of Babak Hodjat and
+   colleagues, "An Adaptive Agent Oriented Software Architecture" (1998),
+   https://arxiv.org/abs/cs/9812015. This project is an independent rendition of
+   that architecture for mesh-native edge deployment. It is not derived from, and
+   carries no code from, any prior AAOSA implementation.
+
+3. @mimik/mcp-kit
+   Copyright mimik Technology, Inc. Bundled into the built mim artifact to provide
+   the Model Context Protocol server surface.
+
+4. Build toolchain
+   The ES5 build pipeline uses esbuild, Babel, core-js, and acorn, each under its
+   own license. These are build-time dependencies fetched into mim/build-tools/
+   and are not redistributed by this repository.

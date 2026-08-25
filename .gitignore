@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+# SECRETS. env.sh holds node IPs, mCM keys, inference keys and edge access
+# tokens. It is created from pov/env.example.sh and must never be committed.
+# ---------------------------------------------------------------------------
+pov/env.sh
+pov/env.tmp
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Build artifacts. mim/build/ is produced by mim/build.sh and packaged by
+# mim/package-addon.sh; it is regenerated on every build and is not source.
+# ---------------------------------------------------------------------------
+mim/build/
+mim/build-tools/node_modules/
+mim/build-tools/step1.cjs
+mim/build-tools/step2.cjs
+
+# ---------------------------------------------------------------------------
+# Dependencies and local runtime output
+# ---------------------------------------------------------------------------
+node_modules/
+logs/
+*.log
+/tmp/
+
+# ---------------------------------------------------------------------------
+# Release archives and scratch files
+# ---------------------------------------------------------------------------
+aaosa-mimoe-pov-*.zip
+aaosa-src-tmp.tgz
+*.tgz
+
+# ---------------------------------------------------------------------------
+# OS and editor noise
+# ---------------------------------------------------------------------------
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/
+*.swp

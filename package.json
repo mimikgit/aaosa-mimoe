@@ -1,0 +1,40 @@
+{
+  "name": "aaosa-mimoe",
+  "version": "0.2.0",
+  "description": "Mesh-native AAOSA agent for mimOE: parallel fan-out, structured claims, cycle guard, mimik-native discovery, and an MCP tool surface (via @mimik/mcp-kit).",
+  "main": "lib/aaosa.js",
+  "bin": {
+    "aaosa-agent": "agent.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mimikgit/aaosa-mimoe.git"
+  },
+  "homepage": "https://github.com/mimikgit/aaosa-mimoe#readme",
+  "bugs": {
+    "url": "https://github.com/mimikgit/aaosa-mimoe/issues"
+  },
+  "keywords": [
+    "aaosa",
+    "mimoe",
+    "mimik",
+    "edge",
+    "multi-agent",
+    "mcp",
+    "neuro-san"
+  ],
+  "scripts": {
+    "start": "node agent.js",
+    "build": "bash mim/build.sh",
+    "package": "bash mim/package-addon.sh",
+    "test": "node test/aaosa-fulfil-recursion.test.js && node test/routing-endpoint.test.js && node test/discovery-sim.js && node test/mcp-sim.js && node test/neurosan-adapter-sim.js && bash test/mim-sim.sh"
+  },
+  "dependencies": {
+    "@mimik/mcp-kit": "^1.1.1"
+  },
+  "license": "Apache-2.0",
+  "private": true
+}
