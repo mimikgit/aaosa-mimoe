@@ -15,6 +15,9 @@
 #   frontman  the coordinator, and normally the inference host for the mesh
 #   network   a specialist with no special hardware requirement
 #   device    needs readable host sensors (Linux /sys + /proc)
+#   netsim    optional 4th role: a network-simulation specialist. Runs happily
+#             on a phone (mimOE Android app) with a small local model. Installed
+#             BY HAND on the device, so remote.sh reports it but never SSHes it.
 #
 # Addresses: macOS `ipconfig getifaddr en0`, Linux `hostname -I`.
 # Leave a role's host EMPTY to run without it (a two-node mesh is valid;
@@ -24,6 +27,7 @@
 export NODE_FRONTMAN_HOST=192.168.1.101
 export NODE_NETWORK_HOST=192.168.1.102
 export NODE_DEVICE_HOST=192.168.1.103
+export NODE_NETSIM_HOST=            # e.g. 192.168.1.120 — leave empty if unused
 
 # --- SSH, for configuring the other nodes from this one (pov/remote.sh) -----
 # The login on EACH machine. These are usually different per machine, so set
@@ -92,6 +96,7 @@ export PI_KEY=
 export FRONT_URL="http://${NODE_FRONTMAN_HOST}:8083/mimik-aaosa/agent/v1"
 export NET_URL="http://${NODE_NETWORK_HOST}:8083/mimik-aaosa/agent/v1"
 export PI_URL="http://${NODE_DEVICE_HOST}:8083/mimik-aaosa/agent/v1"
+export NETSIM_URL="http://${NODE_NETSIM_HOST}:8083/mimik-aaosa/agent/v1"
 
 # ===========================================================================
 # 2. INFERENCE TOPOLOGY: which model each node reasons with, and where
@@ -145,6 +150,20 @@ export NODE_DEVICE_ROUTING_MODEL="Qwen3.6-35B-A3B-Q4_K_M"
 export NODE_DEVICE_WORK_MODEL="Qwen3.6-35B-A3B-Q4_K_M"
 export NODE_DEVICE_INFERENCE_MAX_TOKENS=2048
 
+# --- Node D, netsim: a phone running its own small model -------------------
+# Optional. A phone's model is small and slow, and a peer's WHOLE reply must
+# return inside mimOE's ~20s outbound-read ceiling, so this node is capped
+# harder than any other (200 tokens) and the role adds a brevity instruction.
+# 127.0.0.1 is right here: the phone reasons on the model it hosts itself.
+export NODE_NETSIM_INFERENCE_URL="http://127.0.0.1:8083/mimik-ai/openai/v1"
+export NODE_NETSIM_WORK_MODEL="Qwen3.5-4B-Q3_K_M"
+export NODE_NETSIM_INFERENCE_MAX_TOKENS=200
+# If the phone's model is too weak to emit valid routing JSON, borrow the
+# coordinator's for the routing phases only and keep answering locally:
+#   export NODE_NETSIM_ROUTING_INFERENCE_URL="http://${NODE_FRONTMAN_HOST}:8083/mimik-ai/openai/v1"
+#   export NODE_NETSIM_ROUTING_MODEL="Qwen3.6-35B-A3B-Q4_K_M"
+#   export NODE_NETSIM_ROUTING_INFERENCE_MAX_TOKENS=512
+
 # --- Inference API key, per node ------------------------------------------
 # The [milm-v1] API_KEY in that node's ~/.mimoe/addon/ai-foundation.ini
 # (installer default: 1234). Wrong or empty -> inference returns 401/403.
@@ -153,6 +172,7 @@ MESH_INFERENCE_API_KEY=1234
 export NODE_FRONTMAN_INFERENCE_API_KEY="${MESH_INFERENCE_API_KEY}"
 export NODE_NETWORK_INFERENCE_API_KEY="${MESH_INFERENCE_API_KEY}"
 export NODE_DEVICE_INFERENCE_API_KEY="${MESH_INFERENCE_API_KEY}"
+export NODE_NETSIM_INFERENCE_API_KEY="${MESH_INFERENCE_API_KEY}"
 # Bare names, used by the runbook curls and as the last-resort default for a
 # role with no block above. Deliberately the coordinator's LAN address, not
 # 127.0.0.1: this value has to be correct when read from ANY node.
@@ -185,6 +205,7 @@ MESH_INSIGHT_TOKEN=
 export NODE_FRONTMAN_INSIGHT_TOKEN="${MESH_INSIGHT_TOKEN}"
 export NODE_NETWORK_INSIGHT_TOKEN="${MESH_INSIGHT_TOKEN}"
 export NODE_DEVICE_INSIGHT_TOKEN="${MESH_INSIGHT_TOKEN}"
+export NODE_NETSIM_INSIGHT_TOKEN="${MESH_INSIGHT_TOKEN}"
 
 # The mesh radius: linkLocal (same LAN) | proximity | account.
 export DISCOVERY_SCOPE=linkLocal

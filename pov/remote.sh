@@ -5,7 +5,7 @@
 #   bash pov/remote.sh setup all           copy source + BUILD THERE + install
 #   bash pov/remote.sh setup network       just that one role
 #   bash pov/remote.sh push all            copy the source only, do not build or install
-#   bash pov/remote.sh status              reach every node's agent from here (all three)
+#   bash pov/remote.sh status              reach every node's agent from here
 #   bash pov/remote.sh exec all 'uptime'   run a command on each remote node
 #
 # RUN THIS FROM THE COORDINATOR. "all" therefore means "the other nodes" and
@@ -14,8 +14,14 @@
 #   bash pov/install-addon.sh frontman
 # To drive a coordinator from some other machine, name it: `setup frontman`.
 #
+# "all" also never includes netsim. That role is the phone: no sshd, no scp,
+# no remote sudo. You copy the folder to it and run build-here.sh +
+# install-addon.sh in Termux yourself (RUNBOOK section "Node D"). `status`
+# still reports it, because it answers HTTP on the LAN like any other node.
+#
 # Which machine plays which role comes from pov/env.sh:
-#   NODE_FRONTMAN_HOST / NODE_NETWORK_HOST / NODE_DEVICE_HOST   (+ _USER, _PASS)
+#   NODE_FRONTMAN_HOST / NODE_NETWORK_HOST / NODE_DEVICE_HOST / NODE_NETSIM_HOST
+#   (+ _USER, _PASS)
 # A role whose host is empty is skipped, as is any role pointing at this
 # machine; install that one locally with `bash pov/install-addon.sh <role>`.
 #
@@ -28,12 +34,17 @@ cd "$(dirname "$0")/.."
 # shellcheck disable=SC1091
 source pov/env.sh
 
-ROLES="frontman network device"
+ROLES="frontman network device netsim"
+# Roles this script never provisions over SSH. frontman is this machine;
+# netsim is the phone, which has no sshd. Both are reported by `status` and by
+# the node map — they are part of the mesh, just not of the SSH fan-out.
+MANUAL_ROLES="netsim"
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 -o BatchMode=no"
 REMOTE_PATH="${NODE_REMOTE_PATH:-aaosa-mimoe}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
+is_manual() { case " $MANUAL_ROLES " in *" $1 "*) return 0;; *) return 1;; esac; }
 
 # macOS bsdtar writes LIBARCHIVE.xattr.* extended headers, and anything you
 # unzipped from a download carries com.apple.quarantine. GNU tar on a Linux node
@@ -109,6 +120,8 @@ show_map() {
     user="$(role_user "$r")"; set_user="$(role_var "$r" USER)"
     if [ "$r" = "frontman" ]; then
       printf '   %-9s %-28s %s\n' "$r" "$host" "this machine, not touched by 'all'"
+    elif is_manual "$r"; then
+      printf '   %-9s %-28s %s\n' "$r" "$host" "installed by hand, not touched by 'all'"
     elif [ -z "$set_user" ]; then
       printf '   %-9s %-28s %s\n' "$r" "${user}@${host}" \
         "<- NODE_$(upper "$r")_USER not set, guessed from this machine"
@@ -124,6 +137,11 @@ show_map() {
     iurl="$(role_var "$r" INFERENCE_URL)"
     rmod="$(role_var "$r" ROUTING_MODEL)"
     wmod="$(role_var "$r" WORK_MODEL)"
+    # Since 0.2.0 the agent defaults each model to the other, so a node that
+    # sets only one is using it for both. Print what will actually run, not a
+    # "routing ?" that suggests something is missing.
+    [ -n "$rmod" ] || rmod="$wmod"
+    [ -n "$wmod" ] || wmod="$rmod"
     if [ -n "$iurl" ] || [ -n "$rmod" ]; then
       if [ -n "$wmod" ] && [ "$wmod" != "$rmod" ]; then
         printf '   %-9s   routing %s / work %s\n' "" "${rmod:-?}" "$wmod"
@@ -199,6 +217,18 @@ selected_roles() {
     # push to yourself. Name the role explicitly to override, for the unusual
     # case of driving a coordinator from some other machine.
     if [ "$want" = "all" ] && [ "$r" = "frontman" ]; then continue; fi
+    # The phone has no sshd and no remote sudo: it is installed by hand. Silent
+    # under 'all' (it is not a failure), explicit when you name it, so nobody
+    # sits waiting for an SSH connection that was never going to happen.
+    if is_manual "$r"; then
+      if [ "$want" != "all" ]; then
+        echo "   role '$r' is installed by hand, not over SSH." >&2
+        echo "       Copy this folder to the device, then run there:" >&2
+        echo "         bash pov/build-here.sh && bash pov/install-addon.sh $r" >&2
+        echo "       See the 'Node D' section of pov/RUNBOOK.md." >&2
+      fi
+      continue
+    fi
     host="$(role_host "$r")"
     if [ -z "$host" ]; then
       if [ "$want" != "all" ]; then
@@ -294,12 +324,15 @@ cmd_setup() {
 
 cmd_status() {
   show_map
-  local r host url out
+  local r host url out label
   for r in $ROLES; do
     host="$(role_host "$r")"
     [ -n "$host" ] || continue
     url="http://${host}:8083/mimik-aaosa/agent/v1"
-    printf '%-9s %-22s ' "$r" "$(role_user "$r")@$host"
+    # No login to show for a hand-installed node — printing a guessed username
+    # for a phone would only invite someone to try sshing to it.
+    if is_manual "$r"; then label="$host"; else label="$(role_user "$r")@$host"; fi
+    printf '%-9s %-22s ' "$r" "$label"
     out=$(curl -s --max-time 6 "${url}/descriptor" 2>/dev/null || true)
     if [ -z "$out" ]; then
       echo "UNREACHABLE (mimOE down, addon not installed, or :8083 firewalled)"
@@ -345,5 +378,5 @@ case "${1:-}" in
   setup)  shift; cmd_setup  "${1:-all}" ;;
   status) shift; cmd_status ;;
   exec)   shift; cmd_exec   "${1:-all}" "${2:-}" ;;
-  *) sed -n '2,20p' "$0"; exit 1 ;;
+  *) sed -n '2,26p' "$0"; exit 1 ;;
 esac

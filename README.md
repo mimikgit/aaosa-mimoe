@@ -50,6 +50,8 @@ The outer panels are **machines**, not processes. Every node serves the **same**
 
 Inference is placed per node rather than fixed by the protocol. Node A hosts a shared model through mimik ai. Node C has no local model and borrows Node A's. Node B keeps inference on its own machine, which is why its model is small and token-capped: a peer's entire reply must return inside mimOE's roughly 20 second outbound-read ceiling.
 
+That fourth node is not hypothetical. The RUNBOOK's optional **Node D** is an Android phone running the mimOE app, serving a `netsim` simulation specialist on a model it hosts itself. It is installed by hand rather than over SSH, and the coordinator finds it the same way it finds everything else — nothing on Node A lists it. A phone in this mesh is a peer that gets tasked, not a client that calls in.
+
 The same diagram animated, showing live traffic direction, is [`pov/topology.html`](pov/topology.html). One self-contained file with no dependencies: open it in a browser, no server and no build step.
 
 ### The protocol, in one paragraph
@@ -115,17 +117,18 @@ test/                      simulations and unit tests, no hardware required
 
 ## Prerequisites
 
-Two tiers: the PoV itself, and the optional neuro-san integration on top of it.
+Two sets: what the PoV itself needs, and what the optional neuro-san integration adds on top.
 
-### Tier 1: run the multi-node PoV
+### To run the multi-node PoV
 
 | Requirement | Notes |
 |---|---|
 | **Node.js 18 or newer, plus npm, on EVERY node** | `node -v`. Each node builds its own addon from the source it receives; nothing pre-built is transferred between machines |
 | **Network access on each node's first build** | downloads the ES5 toolchain into `mim/build-tools/` (roughly 45 MB, cached afterwards; slow on a Raspberry Pi) |
 | **2 or 3 machines on one LAN** | any mix of macOS and Linux hosts. Three is the intended shape (coordinator, specialist, device); two works if you drop the network specialist |
+| **An Android phone** (optional fourth node) | the mimOE Android app plus a small local model, running the `netsim` simulation specialist. Installed by hand from a Termux shell, not over SSH. Worth adding because it shows a phone joining as a peer the coordinator tasks, reasoning on a model it hosts itself. RUNBOOK "Node D" |
 | **mimOE runtime installed on each node** | mimik's edge runtime, serving on port `8083`. Get it from the [mimik developer portal](https://developer.mimik.com/) |
-| **mimOE Studio** | mimik's development environment for mimOE. Required for the MCP step: the coordinator is published to mimOE's built-in **MCP gateway** through Studio, not by hand. Also how you inspect and manage what a node runs. See [mimik.com/mimoe](https://mimik.com/mimoe) |
+| **mimOE Studio** | mimik's development environment for mimOE. Required for the MCP step: the coordinator is published to mimOE's built-in **MCP gateway** through Studio, not by hand. Also how you inspect and manage what a node runs. Download it from the [mimOE Studio download page](https://developer.mimik.com/mimOE-studio-download) |
 | **Port 8083 reachable between nodes** | the mesh will form but agents will show `unreachable` if a firewall blocks it |
 | **An inference node** | one machine runs the model for the whole mesh. See the model row below |
 | **mimik ai (`milm`) addon on the inference node** | provides the OpenAI-compatible endpoint at `/mimik-ai/openai/v1`, and its `API_KEY` becomes your `INFERENCE_API_KEY` |
@@ -134,9 +137,9 @@ Two tiers: the PoV itself, and the optional neuro-san integration on top of it.
 | **A device with readable sensors** for the device role | the reference uses a Raspberry Pi 5 and reads `/sys/class/thermal/thermal_zone0/temp` and `/proc/loadavg`. Any Linux host works |
 
 
-### Tier 2: the neuro-san integration (optional)
+### To add the neuro-san integration (optional)
 
-Everything in Tier 1, plus:
+Everything above, plus:
 
 | Requirement | Notes |
 |---|---|
@@ -150,47 +153,23 @@ Nothing in this repository requires a cloud API key unless you choose the neuro-
 
 ## Quick start
 
-### 1. Simulation, about five minutes, no hardware
+Follow **[`pov/RUNBOOK.md`](pov/RUNBOOK.md)** from the top. It is written to be executed literally, node by node, and it ends with the mimik MCP registration and the neuro-san networks.
+
+The shape of it, on each node:
 
 ```sh
 git clone https://github.com/mimikgit/aaosa-mimoe.git
 cd aaosa-mimoe
 chmod +x mim/*.sh pov/*.sh test/*.sh
 
-bash mim/build.sh          # bundles and transpiles to ES5, ends with "ES5 OK"
-bash test/mim-sim.sh       # the shipped bundle in 3 emulated mimOE hosts
-```
-
-Expected tail:
-
-```
-MIM_SIM_PASS: real bundle, 3 emulated mimOE hosts, fan-out + fulfil + synthesis
-DISCOVERY_SIM_PASS
-```
-
-Other simulations, all hardware-free:
-
-```sh
-node test/mcp-sim.js               # the MCP tool surface end to end
-node test/neurosan-adapter-sim.js  # the neuro-san external-agent adapter
-node test/discovery-sim.js         # mInsight parsing against a captured real response
-bash test/dynamic-sim.sh           # a node disappears, degrades, and rejoins
-bash test/local-sim.sh             # three plain-Node agents on one machine
-```
-
-### 2. The real multi-node PoV
-
-Follow **[`pov/RUNBOOK.md`](pov/RUNBOOK.md)** from the top. It is written to be executed literally, node by node, and it ends with the mimik MCP registration and the neuro-san networks.
-
-The shape of it:
-
-```sh
 cp pov/env.example.sh pov/env.sh   # fill in node IPs, keys, tokens
 source pov/env.sh
-bash mim/build.sh                  # once, on the build machine
+bash mim/build.sh                  # bundles and transpiles to ES5, ends with "ES5 OK"
 bash mim/package-addon.sh          # -> mim/build/aaosa-agent-0.2.0.addon
 bash pov/install-addon.sh frontman # then: network on node B, device on node C
 ```
+
+From the coordinator, `bash pov/remote.sh setup all` does the copy, the build and the install on the other nodes for you (RUNBOOK step A7).
 
 ---
 

@@ -3,17 +3,20 @@
 # you pull nodes out and bring them back. Watch membership and routing adapt
 # with zero redeploys and zero config edits.
 #
-#   MBP1_IP=192.168.1.101 bash pov/dynamic-demo.sh
+#   source pov/env.sh && bash pov/dynamic-demo.sh
 #
 # While it runs, in any order:
-#   - stop mimOE on the Pi (sudo systemctl stop mimOE), or pull its power
-#   - close MBP2's lid / kill its heartbeat
-#   - bring either back (restart mimOE + heartbeat resumes announcing)
-#   - deploy a brand-new agent mid-run and heartbeat it in: it joins the
-#     consult set on the next question, no front-man change
+#   - stop mimOE on the device node (sudo systemctl stop mimOE), or pull power
+#   - close the network node's lid
+#   - bring either back: mimOE re-advertises the aaosa service and the agent is
+#     discovered again on the next question. There is no heartbeat to restart
+#   - install the addon on a brand-new node mid-run (the optional phone in the
+#     RUNBOOK's "Node D" is the ready-made one): it joins the consult set on the
+#     next question, with no change on the coordinator. With a phone you can do
+#     the reverse too, by walking it out of Wi-Fi range
 set -uo pipefail
-MBP1_IP="${MBP1_IP:-192.168.1.101}"
-FRONT="http://${MBP1_IP}:8083/mimik-aaosa/agent/v1"
+MBP1_IP="${NODE_FRONTMAN_HOST:-${MBP1_IP:-192.168.1.101}}"
+FRONT="${FRONT_URL:-http://${MBP1_IP}:8083/mimik-aaosa/agent/v1}"
 Q='{"message":"Given the pi'"'"'s current temperature and load, is it safe to add more agent workloads, and what network prep would a second pi need?"}'
 N="${N:-30}"
 SLEEP="${SLEEP:-12}"
