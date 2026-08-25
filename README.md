@@ -1,6 +1,6 @@
 # aaosa-mimoe
 
-**A mesh-native rendition of AAOSA (Adaptive Agent Oriented Software Architecture) running as mimOE microservices at the edge, with a neuro-san integration.**
+**A mesh-native rendition of AAOSA (Adaptive Agent Oriented Software Architecture) running as mims, with a neuro-san integration.**
 
 Agents run as serverless `mim` microservices on ordinary machines (laptops, a Raspberry Pi, a phone), find each other through mimOE's own mesh fabric, negotiate who owns an inquiry, and answer it together. One of them is grounded in real hardware telemetry rather than a simulation.
 
