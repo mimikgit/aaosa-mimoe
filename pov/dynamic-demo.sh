@@ -10,10 +10,9 @@
 #   - close the network node's lid
 #   - bring either back: mimOE re-advertises the aaosa service and the agent is
 #     discovered again on the next question. There is no heartbeat to restart
-#   - install the addon on a brand-new node mid-run (the optional phone in the
-#     RUNBOOK's "Node D" is the ready-made one): it joins the consult set on the
-#     next question, with no change on the coordinator. With a phone you can do
-#     the reverse too, by walking it out of Wi-Fi range
+#   - install the addon on a brand-new node mid-run, with its own NAME and
+#     DESCRIPTION: it joins the consult set on the next question, with no
+#     change on the coordinator
 set -uo pipefail
 MBP1_IP="${NODE_FRONTMAN_HOST:-${MBP1_IP:-192.168.1.101}}"
 FRONT="${FRONT_URL:-http://${MBP1_IP}:8083/mimik-aaosa/agent/v1}"

@@ -2,7 +2,7 @@
 # Install the aaosa addon on THIS node (file-based, no mCM HTTP).
 #
 #   source pov/env.sh
-#   bash pov/install-addon.sh frontman|network|device|netsim
+#   bash pov/install-addon.sh frontman|network|device
 #
 # Copies the built mim/build/aaosa-agent-<version>.addon into ~/.mimoe/addon/,
 # writes the per-role env override ini ([aaosa-agent-v1] section), restarts mimoe.
@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ROLE="${1:?role: frontman | network | device | netsim}"
+ROLE="${1:?role: frontman | network | device}"
 MIMOE_HOME="${MIMOE_HOME:-$HOME/.mimoe}"
 ADDON_DIR="$MIMOE_HOME/addon"
 # Derived from whatever mim/package-addon.sh actually produced, so a version
@@ -68,7 +68,7 @@ case "$ROLE" in
     ;;
   network)
     NAME=network_agent; KIND=specialist
-    DESC="Handles questions about the REAL lab network as it is configured right now: topology, LAN and WiFi setup, firewalls, adding a device to the mesh, and connectivity troubleshooting. Does not run simulations or what-if analysis."
+    DESC="Handles network questions for the lab: topology, LAN/WiFi, firewalls, adding devices to the mesh, connectivity troubleshooting."
     INFER_DEFAULT="http://${FRONTMAN_HOST}:8083/mimik-ai/openai/v1"
     INSTR="Answer lab network questions concisely, in under 120 words, with no preamble and without restating the question."
     IMAXTOK=256
@@ -86,22 +86,6 @@ case "$ROLE" in
                         # runs at fulfil), so never let it emit a speculative one-shot
                         # answer; always run the real fulfil pass. Also enforced in
                         # lib/aaosa.js determine() for any gatherFacts agent.
-    EXTRA=""
-    ;;
-  netsim)
-    NAME=netsim_agent; KIND=specialist
-    # Deliberately disjoint from network_agent: that one owns the network as it
-    # IS, this one owns the network as it MIGHT BE. Routing is decided purely
-    # from these strings, so the two must not overlap or both will claim.
-    DESC="Runs network simulations and what-if analysis: capacity and load modelling, failure and outage scenarios, protocol behaviour under stress, and estimating the effect of a proposed change before it is made. Reasons about hypothetical networks, not the current state of the real lab network."
-    INFER_DEFAULT="http://127.0.0.1:8083/mimik-ai/openai/v1"
-    # A phone's model is small and slow, and a peer's WHOLE reply must return
-    # inside mimOE's ~20s outbound-read ceiling, so this role is capped harder
-    # than any other and told to be brief.
-    INSTR="Answer with a concise simulation result or estimate, under 100 words, no preamble. State the assumptions you used in one short clause."
-    IMAXTOK=200
-    SC=0                # small model: a one-shot speculative answer comes back
-                        # truncated, so always run the real fulfil pass
     EXTRA=""
     ;;
   *) echo "unknown role: $ROLE"; exit 1;;
@@ -139,7 +123,6 @@ case "$ROLE" in
   frontman) SELF_BASE="${FRONT_URL:-http://127.0.0.1:8083/mimik-aaosa/agent/v1}";;
   network)  SELF_BASE="${NET_URL:-http://127.0.0.1:8083/mimik-aaosa/agent/v1}";;
   device)   SELF_BASE="${PI_URL:-http://127.0.0.1:8083/mimik-aaosa/agent/v1}";;
-  netsim)   SELF_BASE="${NETSIM_URL:-http://127.0.0.1:8083/mimik-aaosa/agent/v1}";;
 esac
 MCP_SELF="${MCP_SELF_URL:-${SELF_BASE%/}/mcp}"
 
@@ -197,15 +180,6 @@ echo "-- restarting mimoe"
 # as NODE_SUDO_PASS and we feed it to `sudo -S`. Interactively (the normal
 # case) NODE_SUDO_PASS is unset and this is a plain sudo.
 RESTART_OK=1
-MANUAL_RESTART=0
-# Some hosts run mimOE as an APP, not a service: an Android phone is restarted
-# from the mimOE app's own UI, and there is no command to do it. Detect that
-# and give instructions instead of failing; MIMOE_RESTART=manual|auto forces it.
-IS_ANDROID=0
-case "$(uname -o 2>/dev/null || true)" in Android) IS_ANDROID=1;; esac
-case "${PREFIX:-}" in *com.termux*) IS_ANDROID=1;; esac
-if [ "$IS_ANDROID" = 1 ]; then RESTART_MODE="${MIMOE_RESTART:-manual}"; else RESTART_MODE="${MIMOE_RESTART:-auto}"; fi
-
 as_root() {
   if sudo -n true 2>/dev/null; then
     sudo "$@"                                   # passwordless sudo already available
@@ -228,10 +202,7 @@ EOS
     return 1
   fi
 }
-if [ "$RESTART_MODE" = "manual" ]; then
-  MANUAL_RESTART=1
-  echo "   this host runs mimOE as an app, so there is nothing to restart from here."
-elif systemctl list-units --type=service 2>/dev/null | grep -qi mimoe; then
+if systemctl list-units --type=service 2>/dev/null | grep -qi mimoe; then
   SVC=$(systemctl list-units --type=service | grep -i mimoe | awk '{print $1}' | head -1)
   as_root systemctl restart "$SVC" || RESTART_OK=0
 elif [ -x "$MIMOE_HOME/bin/mimoe" ]; then
@@ -319,16 +290,6 @@ fi
 # Exit non-zero when the config was written but mimOE never reloaded it. Without
 # this, pov/remote.sh reports "ok" for a node that is still running the previous
 # configuration, which is a slow and confusing way to find out.
-if [ "$MANUAL_RESTART" = "1" ]; then
-  echo
-  echo "== ACTION REQUIRED ON THIS DEVICE =="
-  echo "   The addon and the ${ROLE} ini are installed, but mimOE has not reloaded"
-  echo "   them. Open the mimOE app, stop it, and start it again."
-  echo "   Then confirm from the coordinator:"
-  echo "       curl -s http://<this-device>:8083/mimik-aaosa/agent/v1/descriptor"
-  echo "   Until you do, this node is not in the mesh."
-  exit 0
-fi
 if [ "$RESTART_OK" != "1" ]; then
   echo "-- FAILED: role ini written to ${INI}, but mimOE was NOT restarted." >&2
   echo "   Nothing above is in effect until it reloads." >&2

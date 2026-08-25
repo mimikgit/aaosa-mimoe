@@ -50,8 +50,6 @@ The outer panels are **machines**, not processes. Every node serves the **same**
 
 Inference is placed per node rather than fixed by the protocol. Node A hosts a shared model through mimik ai. Node C has no local model and borrows Node A's. Node B keeps inference on its own machine, which is why its model is small and token-capped: a peer's entire reply must return inside mimOE's roughly 20 second outbound-read ceiling.
 
-That fourth node is not hypothetical. The RUNBOOK's optional **Node D** is an Android phone running the mimOE app, serving a `netsim` simulation specialist on a model it hosts itself. It is installed by hand rather than over SSH, and the coordinator finds it the same way it finds everything else — nothing on Node A lists it. A phone in this mesh is a peer that gets tasked, not a client that calls in.
-
 The same diagram animated, showing live traffic direction, is [`pov/topology.html`](pov/topology.html). One self-contained file with no dependencies: open it in a browser, no server and no build step.
 
 ### The protocol, in one paragraph
@@ -126,14 +124,13 @@ Two sets: what the PoV itself needs, and what the optional neuro-san integration
 | **Node.js 18 or newer, plus npm, on EVERY node** | `node -v`. Each node builds its own addon from the source it receives; nothing pre-built is transferred between machines |
 | **Network access on each node's first build** | downloads the ES5 toolchain into `mim/build-tools/` (roughly 45 MB, cached afterwards; slow on a Raspberry Pi) |
 | **2 or 3 machines on one LAN** | any mix of macOS and Linux hosts. Three is the intended shape (coordinator, specialist, device); two works if you drop the network specialist |
-| **An Android phone** (optional fourth node) | the mimOE Android app plus a small local model, running the `netsim` simulation specialist. Installed by hand from a Termux shell, not over SSH. Worth adding because it shows a phone joining as a peer the coordinator tasks, reasoning on a model it hosts itself. RUNBOOK "Node D" |
-| **mimOE runtime installed on each node** | mimik's edge runtime, serving on port `8083`. Get it from the [mimik developer portal](https://developer.mimik.com/) |
-| **mimOE Studio** | mimik's development environment for mimOE. Required for the MCP step: the coordinator is published to mimOE's built-in **MCP gateway** through Studio, not by hand. Also how you inspect and manage what a node runs. Download it from the [mimOE Studio download page](https://developer.mimik.com/mimOE-studio-download) |
+| **mimOE runtime `3.30` or newer, on each node** | mimik's edge runtime, serving on port `8083`. Get it from the [mimik developer portal](https://developer.mimik.com/). Older releases are not supported for this PoV |
+| **mimOE Studio `1.0.9` or newer** | mimik's development environment for mimOE. Required for the MCP step: the coordinator is published to mimOE's built-in **MCP gateway** through Studio, not by hand. Also how you inspect and manage what a node runs. Download it from the [mimOE Studio download page](https://developer.mimik.com/mimOE-studio-download) |
 | **Port 8083 reachable between nodes** | the mesh will form but agents will show `unreachable` if a firewall blocks it |
 | **An inference node** | one machine runs the model for the whole mesh. See the model row below |
 | **mimik ai (`milm`) addon on the inference node** | provides the OpenAI-compatible endpoint at `/mimik-ai/openai/v1`, and its `API_KEY` becomes your `INFERENCE_API_KEY` |
 | **A local model** | the reference lab uses `Qwen3.6-35B-A3B-Q4_K_M` (Q4_K_M GGUF, roughly 20 GB on disk, 32 GB RAM or more recommended). Any OpenAI-compatible chat model works; smaller models need the token and brevity caps described in the RUNBOOK |
-| **An edge access token per node** (`INSIGHT_TOKEN`) | a JWT each mim uses to read its own node's mesh service. Minted with `@mimik/mimik-edge-cli` from a Developer ID Token issued by [console.mimik.com](https://console.mimik.com). RUNBOOK appendix has the exact commands |
+| **An edge access token per node** (`INSIGHT_TOKEN`) | a JWT each mim uses to read its own node's mesh service. Minted with `@mimik/mimik-edge-cli` from a Developer ID Token issued by [console.mimik.com](https://console.mimik.com), plus that node's own mimOE API key, which mimOE writes to `~/.mimoe/mimoe-api-key.env` on the node. RUNBOOK appendix has the exact commands |
 | **A device with readable sensors** for the device role | the reference uses a Raspberry Pi 5 and reads `/sys/class/thermal/thermal_zone0/temp` and `/proc/loadavg`. Any Linux host works |
 
 

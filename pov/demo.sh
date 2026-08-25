@@ -30,11 +30,6 @@ ask '"What network setup do we need to add a second raspberry pi to this lab?"'
 echo "=== 3. Needs both: fan-out, two fulfils, one synthesis ==="
 ask '"Given the pi'"'"'s current temperature and load, is it safe to add more agent workloads to it, and what network prep would a second pi need?"'
 
-# Only interesting once the optional phone node is installed (RUNBOOK, Node D).
-# Without it the coordinator answers alone, which is also worth seeing.
-echo "=== 4. What-if: routes to the simulation agent if Node D is present ==="
-ask '"If we add ten more devices to this lab, what happens to the network?"'
-
 if [ -n "$PI" ]; then
   echo "=== Raw device metrics, no LLM in the path ==="
   curl -s "${PI}/metrics" | J

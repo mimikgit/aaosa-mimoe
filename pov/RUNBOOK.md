@@ -2,26 +2,23 @@
 
 Execute this literally, in order. Every command assumes you have sourced `pov/env.sh` in that terminal, on that machine.
 
-## The roles
+## The three roles
 
-Three roles make the PoV. A fourth is optional. Assign them to whatever hardware you have.
+The PoV uses three roles. Assign them to whatever hardware you have.
 
 | Role | Install argument | What it does | Wants |
 |---|---|---|---|
 | **Node A** coordinator | `frontman` | Entry point. Discovers peers, runs determine/adjudicate/fulfil/synthesize, serves `/chat` and `/mcp` | The most RAM. It normally also hosts inference for the whole mesh |
-| **Node B** specialist | `network` | Answers questions about the **real** lab network from its model. Declines everything else | Anything. May borrow Node A's model or run its own smaller one |
+| **Node B** specialist | `network` | Answers network questions from its model. Declines everything else | Anything. May borrow Node A's model or run its own smaller one |
 | **Node C** device | `device` | Answers from **live telemetry** pushed by its host: CPU temperature, load, memory, uptime | A Linux host with readable sensors (a Raspberry Pi is ideal) |
-| **Node D** simulation *(optional)* | `netsim` | Runs **what-if** analysis: capacity and load modelling, failure scenarios, the effect of a change before it is made | An Android phone running the mimOE app with a small local model. Any machine works too |
 
-Two nodes are enough if you drop Node B. Node C is the one that makes the demo worth watching, so do not drop it. Node D is the one that shows a phone joining the mesh as a peer, not as a client; skip it and nothing else changes.
-
-Nodes B and D are deliberately **disjoint**: B knows how the lab is wired right now, D reasons about networks that do not exist yet. A question that needs both ("we are about to add ten devices — will the current setup hold?") is what makes the coordinator task them together.
+Two nodes are enough if you drop Node B. Node C is the one that makes the demo worth watching, so do not drop it.
 
 ![Topology: the three roles, the MCP and AAOSA links between them, and where inference runs](topology.svg)
 
 `topology.svg` sits beside this runbook, and [`topology.html`](topology.html) is the same picture animated: open it in a browser to watch traffic direction on each link.
 
-**A note on variable names.** Nodes are declared by **role**, not by hardware: `NODE_FRONTMAN_HOST`, `NODE_NETWORK_HOST`, `NODE_DEVICE_HOST`, `NODE_NETSIM_HOST`. The older names `MBP1_IP` / `MBP2_IP` / `PI_IP` came from the reference lab (Appendix B) and are still set, as aliases derived from the role variables, so existing scripts and older notes keep working.
+**A note on variable names.** Nodes are declared by **role**, not by hardware: `NODE_FRONTMAN_HOST`, `NODE_NETWORK_HOST`, `NODE_DEVICE_HOST`. The older names `MBP1_IP` / `MBP2_IP` / `PI_IP` came from the reference lab (Appendix B) and are still set, as aliases derived from the role variables, so existing scripts and older notes keep working.
 
 ---
 
@@ -36,11 +33,11 @@ All commands below use environment variables. Set them once in a file and source
 
 2. Edit `pov/env.sh` and fill in every blank. Where each value comes from:
 
-   - `NODE_FRONTMAN_HOST`, `NODE_NETWORK_HOST`, `NODE_DEVICE_HOST`, and optionally `NODE_NETSIM_HOST`: which machine plays which role, by LAN address. macOS: `ipconfig getifaddr en0`. Linux: `hostname -I`. All of them must be on the same LAN with `:8083` reachable between them. Leave a role's host empty to run without it (a two-node mesh is valid; drop `network` rather than `device`).
+   - `NODE_FRONTMAN_HOST`, `NODE_NETWORK_HOST`, `NODE_DEVICE_HOST`: which machine plays which role, by LAN address. macOS: `ipconfig getifaddr en0`. Linux: `hostname -I`. All of them must be on the same LAN with `:8083` reachable between them. Leave a role's host empty to run without it (a two-node mesh is valid; drop `network` rather than `device`).
    - `NODE_<ROLE>_USER`: the SSH login **on that machine**, used only by `pov/remote.sh`. Logins are per-machine and usually differ, so set each one literally: run `whoami` on a node to read it. Do not write `$USER` here; `env.sh` is copied to every node, and `$USER` would be re-evaluated by whichever machine sources it, so one file would silently mean a different login on each node. Leaving one blank is allowed: `remote.sh` falls back to the login you are running as and prints `<- NODE_..._USER not set, guessed from this machine` in the node map, so a wrong guess is visible rather than a confusing permission denied. Every `remote.sh` command prints that map before it does anything.
    - `NODE_<ROLE>_PASS`: the SSH password for that machine, needed only until you run `bash pov/remote.sh keys`, which installs your SSH key on every node; after that, blank the `_PASS` lines. `remote.sh` strips every `*_PASS` value out of `env.sh` before copying it to a node, so passwords never leave this machine.
    - `NODE_<ROLE>_SUDO_PASS`: **a different thing from the SSH password.** Restarting mimOE needs root on a Linux node, and over SSH the *remote* side has no terminal for a sudo prompt. Running `remote.sh keys` removes the SSH password but not this one, so a Raspberry Pi still needs it. **Leave it blank**: `remote.sh` asks on your own terminal when it needs one and pipes the answer through, so the password never goes in a file. Fill it in only for unattended runs, where nothing can ask. Blank also falls back to that node's `_PASS`. To remove the need altogether, give that login passwordless sudo for the restart only: `echo "$(whoami) ALL=(root) NOPASSWD: $(command -v systemctl) restart mimOE" | sudo tee /etc/sudoers.d/mimoe-restart`. `install-addon.sh` tries passwordless sudo first, so once that exists nothing asks again.
-   - `MBP1_KEY`, `MBP2_KEY`, `PI_KEY`: the mCM credential you have for each node. This is the bearer `mim/deploy.sh` sends to that node's mCM (as `MCM_TOKEN`; legacy alias `MCM_API_KEY`). **Optional**: the file-based addon install used by this runbook needs no mCM credential at all. If your mCM rejects the key with 403 `A JWT Token is required`, your build wants minted edge access tokens: see Appendix A.
+   - `MBP1_KEY`, `MBP2_KEY`, `PI_KEY`: the mCM credential for each node. This is the bearer `mim/deploy.sh` sends to that node's mCM (as `MCM_TOKEN`; legacy alias `MCM_API_KEY`). **You do not have to invent or hunt for these**: mimOE writes each node's key to `~/.mimoe/mimoe-api-key.env` on that node, so read it there (`cat ~/.mimoe/mimoe-api-key.env`) on each machine. **Optional**: the file-based addon install used by this runbook needs no mCM credential at all. If your mCM rejects the key with 403 `A JWT Token is required`, your build wants minted edge access tokens: see Appendix A.
    - **The inference topology**, `NODE_<ROLE>_INFERENCE_URL` / `_ROUTING_MODEL` / `_WORK_MODEL` / `_INFERENCE_MAX_TOKENS`: which model each node reasons with, and where it reaches it. This is what makes the install identical on every node: `source pov/env.sh` then `bash pov/install-addon.sh <role>`, with no per-node edits and no inline overrides, because each node reads its own block. `install-addon.sh` resolves `NODE_<ROLE>_<SETTING>` first, then a bare `<SETTING>` as a mesh-wide default, then the role's built-in default, and prints which one it used. One rule matters: write `127.0.0.1` only inside a node's own block, meaning "this node's own mimik ai"; to point at another node use `${NODE_FRONTMAN_HOST}`, never `127.0.0.1`.
    - `NODE_<ROLE>_ROUTING_INFERENCE_URL` (optional): run the **routing** phases (determine, adjudicate, synthesize) on a *different* endpoint from the **work** phase (fulfil). Unset, the two share one endpoint, which is what every node does by default. Set it when a node's local model is small enough to truncate routing JSON (the `"Full"` speculative, or `determine error: expected JSON`): that node borrows the coordinator's larger model for routing and still answers locally. It works in reverse too, keeping routing local and cheap while only fulfil goes to a bigger model. Companions: `_ROUTING_INFERENCE_API_KEY` (another node's mimik ai has its own key) and `_ROUTING_INFERENCE_MAX_TOKENS` (routing JSON needs far fewer tokens than an answer). **The cost is real**: determine runs on every inquiry, and the up-chain's `DEADLINE_MS` covers a peer's whole reply including that peer's own inference call, so splitting routing off-node adds a LAN round trip inside that budget and concentrates routing traffic on one machine. Leave it unset unless a node's routing is actually failing.
    - `NODE_<ROLE>_INFERENCE_API_KEY`: the mimik ai key on that node: the `[milm-v1] API_KEY` in its `~/.mimoe/addon/ai-foundation.ini` (installer default `1234`). A wrong or empty value makes inference return 401/403. Set `MESH_INFERENCE_API_KEY` once if every node uses the same key.
@@ -126,7 +123,7 @@ An agent is "in the mesh" when its node's mimOE advertises the aaosa service, no
        bash pov/remote.sh keys      # once: put your SSH key on every node
        bash pov/remote.sh setup all
 
-   These commands are run **from the coordinator**, so `all` means *the other nodes*: it never includes `frontman`, which you already installed in A6, and it never includes `netsim`, the optional phone, which has no sshd and is installed by hand (Node D). Nothing is copied to this machine, and no SSH key is installed on it. Every command prints the resolved node map first, so you can see what it is about to touch. To do a single node: `bash pov/remote.sh setup network`. (Driving a coordinator from some other machine is possible but unusual: name the role explicitly, `bash pov/remote.sh setup frontman`.) Then check every node's agent from here, this one included:
+   These commands are run **from the coordinator**, so `all` means *the other nodes*: it never includes `frontman`, which you already installed in A6. Nothing is copied to this machine, and no SSH key is installed on it. Every command prints the resolved node map first, so you can see what it is about to touch. To do a single node: `bash pov/remote.sh setup network`. (Driving a coordinator from some other machine is possible but unusual: name the role explicitly, `bash pov/remote.sh setup frontman`.) Then check every node's agent from here, this one included:
 
        bash pov/remote.sh status
 
@@ -194,52 +191,6 @@ An agent is "in the mesh" when its node's mimOE advertises the aaosa service, no
 
 ---
 
-## Node D: network simulation specialist on a phone (optional)
-
-Everything above this line works without Node D. Add it when you want to show that a phone joins the mesh as a **peer that the coordinator tasks**, not as a client that calls it, and that it reasons on a model it hosts itself.
-
-The role is `netsim`. It answers what-if questions — capacity and load modelling, failure and outage scenarios, the effect of a proposed change — and it is deliberately disjoint from Node B, which only knows the lab as it is wired right now. Neither one claims the other's questions, so `determine` picks between them for a narrow inquiry and tasks both for a broad one.
-
-**This node is installed by hand.** A phone has no sshd and no remote sudo, so `pov/remote.sh` never provisions it: `setup all` skips it silently, naming it prints the two commands below, and `status` still reports it because it answers HTTP on the LAN like any other node.
-
-1. **On the phone**, before anything else:
-
-   - the **mimOE Android app** installed and running, with `:8083` reachable from the coordinator (same Wi-Fi, and the AP must not have client isolation on): `curl -s http://<phone-ip>:8083/mimik-mesh/insight/v1/nodes` from Node A should answer.
-   - a **local model** loaded through mimik ai on the phone. This is what makes the node interesting; a phone borrowing the coordinator's model proves nothing.
-   - a **shell with Node.js 18+**, which on Android means Termux (`pkg install nodejs-lts`). The addon is built on the device like every other node.
-   - the phone's LAN address in `NODE_NETSIM_HOST`, and its model name in `NODE_NETSIM_WORK_MODEL`, in `pov/env.sh` **on the coordinator** — then re-run `bash pov/remote.sh push all` so the other nodes see the new member's block too.
-
-2. **Get the folder onto the phone.** Any route works, because nothing here needs SSH: a USB copy, a share sheet, `git clone` in Termux, or from the coordinator over HTTP. Do not copy `node_modules` or `package-lock.json`; the phone builds its own.
-
-3. **Build and install, in Termux:**
-
-       cd ~/aaosa-mimoe && source pov/env.sh
-       bash pov/build-here.sh              # first build downloads the ES5 toolchain
-       bash pov/install-addon.sh netsim
-
-   The installer detects Android and stops short of restarting mimOE, ending with an **ACTION REQUIRED ON THIS DEVICE** block. That is expected: the addon and the `netsim` ini are written, but the app has not reloaded them. Force the behaviour either way with `MIMOE_RESTART=manual` or `MIMOE_RESTART=auto` if the detection is wrong for your device.
-
-4. **Restart mimOE from the app** — stop it and start it again in the mimOE UI. There is no command for this; the app owns the process.
-
-5. **Verify from Node A**, not from the phone:
-
-       curl -s "$NETSIM_URL/descriptor"    # netsim_agent, with its specialty
-       curl -s "$FRONT_URL/mesh"           # now lists four agents
-       bash pov/remote.sh status           # netsim appears, with no login shown
-
-   Then ask it something only it can answer:
-
-       curl -s "$FRONT_URL/chat" -H "Content-Type: application/json" \
-         -d '{"message":"If we add ten more devices to this lab, what happens to the network?"}'
-
-   The trace should show `netsim_agent` claiming it. A question about the current wiring should go to `network_agent` instead, and a question that spans both should task both.
-
-**If the phone's answers come back empty or the trace shows `determine error: expected JSON`,** its model is too small to emit routing JSON reliably. Keep the answer local and borrow the coordinator's model for routing only, with the `NODE_NETSIM_ROUTING_INFERENCE_URL` block already commented out in `env.example.sh`. The 200-token cap and the brevity instruction the role applies are there for the same reason: a peer's whole reply must return inside mimOE's roughly 20 second outbound-read ceiling, and a phone is the slowest node in the mesh.
-
-Nothing else in the PoV changes. The coordinator discovered the phone through mInsight the moment its mimOE advertised the aaosa service; no file on Node A lists it, and unplugging the phone drops it out of `/mesh` within a mesh cycle.
-
----
-
 ## Demo (run from Node A, or any machine that sourced env.sh)
 
 1. The three routing scenarios:
@@ -248,11 +199,7 @@ Nothing else in the PoV changes. The coordinator discovered the phone through mI
        curl -s "$FRONT_URL/chat" -H "Content-Type: application/json" -d '{"message":"What network setup do we need to add a second raspberry pi to this lab?"}'
        curl -s "$FRONT_URL/chat" -H "Content-Type: application/json" -d '{"message":"Given the pi'"'"'s temperature and load, is it safe to add more agent workloads, and what network prep would a second pi need?"}'
 
-   The first should route to the device agent alone, the second to the network agent alone, the third to both with a synthesized answer. With the optional Node D installed, add a fourth:
-
-       curl -s "$FRONT_URL/chat" -H "Content-Type: application/json" -d '{"message":"If we add ten more devices to this lab, what happens to the network?"}'
-
-   That one should go to `netsim_agent`, and the second question above should still go to `network_agent`: the two are written to be disjoint. `bash pov/demo.sh` runs the whole set in order, mesh membership first.
+   The first should route to the device agent alone, the second to the network agent alone, the third to both with a synthesized answer. `bash pov/demo.sh` runs the whole set in order, mesh membership first.
 
    Check each response's `trace`. The `determine` phase lists who was consulted (`claimed` / `declined` / `unreachable`); the `fulfil` phase lists what each tasked peer returned (`ok` / `empty` / `timeout`), with per-phase timings. `empty` means the peer replied but with no usable content, so it is not counted as a contributor and the coordinator answers that part itself; a peer stuck on `empty` is an inference/model issue on that node, not a mesh issue.
 
@@ -260,7 +207,7 @@ Nothing else in the PoV changes. The coordinator discovered the phone through mI
 
        bash pov/dynamic-demo.sh          # reads the coordinator's address from env.sh
 
-   While it loops: stop mimOE on Node C (`sudo systemctl stop mimOE`) and watch it fall out of `/mesh` within a mesh cycle as mInsight stops advertising it; close Node B's lid for the same story; bring either back and watch it rejoin on its own, no heartbeat to restart. Install the addon on a further node — Node D above, or any machine with a new role and DESCRIPTION — and watch it join mid-run the moment its mimOE registers the aaosa service. A phone is the sharpest version of this: walk it out of Wi-Fi range and back.
+   While it loops: stop mimOE on Node C (`sudo systemctl stop mimOE`) and watch it fall out of `/mesh` within a mesh cycle as mInsight stops advertising it; close Node B's lid for the same story; bring either back and watch it rejoin on its own, no heartbeat to restart. Install the addon on a fourth node (a new role and DESCRIPTION) and watch it join mid-run the moment its mimOE registers the aaosa service.
 
 ---
 
@@ -303,7 +250,7 @@ What Studio needs, and where each value comes from:
 
 Steps:
 
-1. Open **mimOE Studio** and connect it to Node A, the coordinator.
+1. Open **mimOE Studio** (`1.0.9` or newer, against mimOE `3.30` or newer) and connect it to Node A, the coordinator.
 2. Confirm Studio lists the `aaosa-agent` addon as running on that node. If it does not, the install in A6 did not take: re-run `bash pov/install-addon.sh frontman` and make sure mimOE actually restarted (see the note in the troubleshooting section about macOS).
 3. Open the node's **MCP gateway** view and add a new MCP server with the values in the table above.
 4. Save, then confirm the gateway lists `front_man` among its available tools.
@@ -473,7 +420,6 @@ The worked reference is [`neuro-san/registries/examples/telco_network_orchestrat
 - **`sshpass is required for password auth and is not installed`**: install it (`brew install hudochenkov/sshpass/sshpass`, or `apt install sshpass`), or skip passwords entirely by running `ssh-copy-id` to each node yourself. Once keys work, `remote.sh` never needs `sshpass` again.
 - **`tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr...'` on a Linux node**: a warning, not a failure. Extraction succeeds and tar exits 0, so the install continues. macOS `bsdtar` writes extended-attribute headers that GNU tar does not recognise, and files you unzipped from a download carry `com.apple.quarantine`. `remote.sh` now strips that metadata when it builds the archive, so it should not appear. If you see it from an older copy, or from some other transfer, it is safe to ignore; to clear the attribute at the source: `xattr -dr com.apple.quarantine ~/Projects/aaosa-mimoe`.
 - **The device agent answers but has no numbers, and `/metrics` says `no telemetry pushed yet`**: the feed is not running. `systemctl status aaosa-telemetry` on that node, and `journalctl -u aaosa-telemetry -n 20` for why. `bash pov/remote.sh status` shows the same thing from the coordinator, as a `telemetry` line. If the service was never installed (no systemd, or `TELEMETRY_SERVICE=0`), run `INTERVAL=15 bash pov/pi-telemetry-push.sh` on that host.
-- **`role 'netsim' is installed by hand, not over SSH`**: expected. Node D is the phone: no sshd, no remote sudo, nothing for `remote.sh` to drive. `setup all` skips it without a word; you only see this message when you name it. Follow the Node D section instead. `status` still reports it, because reaching it is plain HTTP.
 - **`no addon in mim/build/ — run: bash mim/build.sh && bash mim/package-addon.sh`**: seen on the node being installed, not on the coordinator. Since v0.2.0 each node builds its own addon — `remote.sh` copies source only, never `node_modules`, `package-lock.json` or `mim/build` — so this means `pov/build-here.sh` did not run or did not finish there. Re-run it on that node and read the output; the usual cause is a Node version older than 18.
 - **`setup` reports FAILED with `restarting mimOE needs root` even though you supplied a password**: fixed in v0.2.0. `remote.sh` probed key access with `ssh <host> true` from inside the pipeline carrying the password, and ssh forwards stdin to the remote command, so the probe consumed the password and the remote `head -n1` read EOF. The probe now runs with `-n </dev/null`. If you see this on an older copy, update `pov/remote.sh`.
 - **`setup` reports FAILED with `restarting mimOE needs root, and this session has no way to authenticate`**: the role ini was written but mimOE never reloaded it, so nothing is in effect. Run `remote.sh` from an interactive terminal and it will ask for that node's sudo password; the error only appears when nothing can be asked (a pipeline, cron, an editor's task runner) and `NODE_<ROLE>_SUDO_PASS` is empty. Set that variable for unattended runs, or give the login passwordless sudo for the restart. This is separate from SSH auth: keys fix the login, not sudo.
@@ -501,8 +447,6 @@ The worked reference is [`neuro-san/registries/examples/telco_network_orchestrat
 - **Image upload 400 (other messages)**: usually the tarball. macOS tar adds AppleDouble/xattr entries for files from a downloaded zip; rebuild with `mim/build.sh` (plain ustar, must show exactly `index.js`).
 - **Agents say the inquiry is empty, or the coordinator asks for details**: your `/chat` curl lacks `-H "Content-Type: application/json"`; the engine drops bodies with other content types. Same class of issue as the step A3 pre-warm curl.
 - **neuro-san cannot reach the tool**: from the neuro-san host, `curl -s http://<node-a>:8083/mimik-aaosa/agent/v1/healthcheck`. If that fails it is routing or firewall, not neuro-san. If it succeeds but the tool never appears, re-check that the URL in the HOCON ends in `/mcp`.
-- **The phone installed cleanly but never appears in `/mesh`**: the mimOE app was not restarted, so it is still serving the old registration. The installer said so, in the `ACTION REQUIRED ON THIS DEVICE` block, and exits 0 there because there is nothing it can do about it. Stop and start mimOE in the app, then `curl -s "$NETSIM_URL/descriptor"` from the coordinator. If that answers but `/mesh` stays at three, the phone is on a different subnet or the access point has client isolation on: `curl -s http://<phone-ip>:8083/mimik-mesh/insight/v1/nodes` from Node A is the quickest way to tell the two apart.
-- **`netsim_agent` and `network_agent` both claim everything, or neither claims anything**: their descriptions have drifted into each other. They are written to be disjoint — one owns the network as it is configured right now, the other owns hypotheticals — and routing quality is description quality. Check what each node is actually serving with `curl -s "$NETSIM_URL/descriptor"` and `curl -s "$NET_URL/descriptor"`; if a node was installed before v0.2.0 it still carries the old overlapping text, so reinstall it.
 - **Wrong routing**: routing quality is description quality; sharpen the agent DESCRIPTION and redeploy.
 
 ---
@@ -512,7 +456,7 @@ The worked reference is [`neuro-san/registries/examples/telco_network_orchestrat
 Some mimOE builds reject static keys on mCM with 403 `invalid edgeAccessToken: A JWT Token is required`. `INSIGHT_TOKEN` always wants one of these. In that case the per-node credential must be a minted edge access token:
 
 1. Get a **Developer ID Token**: [console.mimik.com](https://console.mimik.com), create a project, open the project, click **Get ID Token** (short-lived; re-copy when minting fails).
-2. Mint per node, using that node's locally configured mimOE API key (`grep -rn "API_KEY" ~/.mimoe/addon/*.ini`; installer default `1234`):
+2. Mint per node, using that node's own mimOE API key. It is in `~/.mimoe/mimoe-api-key.env` on that node (`cat ~/.mimoe/mimoe-api-key.env`); the addon inis are a fallback place to look (`grep -rn "API_KEY" ~/.mimoe/addon/*.ini`; installer default `1234`):
 
        export DEV_ID_TOKEN=<from the console>
        export MBP1_KEY=$(npx --yes @mimik/mimik-edge-cli account get-edge-access-token -t "$DEV_ID_TOKEN" --api-key "<that node's api key>" | jq -r .access_token)
@@ -532,8 +476,6 @@ The configuration this PoV was developed and validated on, for anyone reproducin
 | Node A, coordinator | MacBook Pro (Apple Silicon), 36 GB | serves `Qwen3.6-35B-A3B-Q4_K_M` for the whole mesh through mimik ai |
 | Node B, network specialist | second MacBook Pro | borrows Node A's model by default; also validated running a local 4B with the 256-token brevity cap |
 | Node C, device agent | Raspberry Pi 5, Ubuntu, mimOE as a systemd service | borrows Node A's model; pushes its own telemetry locally |
-
-Node D, the optional simulation specialist on an Android phone with its own small local model, was added after this baseline was measured and is not part of the numbers below. Expect it to be the slowest peer in any mesh it joins, which is why its role caps output at 200 tokens.
 
 Measured behaviour on that lab: a cross-node `determine` round costs roughly 3 to 5 s (dominated by remote inference), and a `fulfil` roughly 0.8 s. That is the baseline protocol cost, and it is why the coordinator and the device both point at the fast model while only the network specialist is clamped.
 
